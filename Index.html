@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق اتجاه القبلة 🕋</title>
+    <style>
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            text-align: center; 
+            margin-top: 50px; 
+            background-color: #f0f2f5; 
+            color: #333;
+        }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1); 
+            display: inline-block; 
+            max-width: 90%; 
+        }
+        button { 
+            padding: 12px 25px; 
+            font-size: 16px; 
+            font-weight: bold;
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            transition: background 0.3s;
+        }
+        button:hover { 
+            background-color: #0056b3; 
+        }
+        #result-box { 
+            margin-top: 20px; 
+            font-size: 16px; 
+            line-height: 1.6;
+        }
+        .highlight { 
+            color: #28a745; 
+            font-size: 24px; 
+            font-weight: bold; 
+            display: block;
+            margin: 15px 0;
+        }
+        /* تصميم البوصلة */
+        .compass-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            border: 8px solid #333;
+            border-radius: 50%;
+            margin: 30px auto 10px;
+            display: none; /* مخفية لحد ما نحسب الاتجاه */
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.1);
+        }
+        .north-marker {
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-weight: bold;
+            color: #d9534f;
+        }
+        .needle {
+            position: absolute;
+            width: 6px;
+            height: 90px;
+            background-color: #28a745; /* لون إبرة القبلة */
+            bottom: 50%;
+            left: calc(50% - 3px);
+            transform-origin: bottom center;
+            transition: transform 1s cubic-bezier(0.25, 0.1, 0.25, 1);
+            border-radius: 3px 3px 0 0;
+        }
+        .needle::after {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -7px;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 15px solid #28a745;
+        }
+        .center-dot {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background-color: #333;
+            border-radius: 50%;
+            top: calc(50% - 8px);
+            left: calc(50% - 8px);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>أين القبلة؟ 🕋</h2>
+    <p>اسمح للمتصفح بمعرفة موقعك عشان نحسب اتجاه القبلة بدقة.</p>
+    
+    <button onclick="getLocationAndCalculate()">📍 حدد اتجاه القبلة</button>
+    
+    <div id="result-box"></div>
+    
+    <div class="compass-container" id="compass">
+        <div class="north-marker">N</div>
+        <div class="needle" id="qibla-needle"></div>
+        <div class="center-dot"></div>
+    </div>
+</div>
+
+<script>
+    // إحداثيات الكعبة المشرفة
+    const KAABA_LAT = 21.422487;
+    const KAABA_LNG = 39.826206;
+
+    function getLocationAndCalculate() {
+        const resultBox = document.getElementById("result-box");
+        resultBox.innerHTML = "جاري البحث عن موقعك...";
+        
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(showQibla, showError, {
+                enableHighAccuracy: true
+            });
+        } else {
+            resultBox.innerHTML = "للأسف، متصفحك لا يدعم تحديد الموقع.";
+        }
+    }
+
+    function showQibla(position) {
+        const userLat = position.coords.latitude;
+        const userLng = position.coords.longitude;
+
+        // دوال مساعدة لتحويل الدرجات إلى راديان والعكس
+        const toRad = (deg) => deg * Math.PI / 180;
+        const toDeg = (rad) => rad * 180 / Math.PI;
+
+        const lat1 = toRad(userLat);
+        const lat2 = toRad(KAABA_LAT);
+        const lngDiff = toRad(KAABA_LNG - userLng);
+
+        // تطبيق معادلة حساب المثلثات الكروية
+        const y = Math.sin(lngDiff) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(lngDiff);
+        
+        let qiblaRad = Math.atan2(y, x);
+        
+        // تحويل النتيجة لدرجات وضبطها في نطاق 360 درجة
+        let qiblaDeg = (toDeg(qiblaRad) + 360) % 360;
+
+        // عرض النتائج النصية
+        document.getElementById("result-box").innerHTML = 
+            `موقعك الحالي: <br> خط عرض ${userLat.toFixed(4)} | خط طول ${userLng.toFixed(4)}` +
+            `<span class="highlight">زاوية القبلة: ${qiblaDeg.toFixed(1)}° درجة</span>` +
+            `<small>امسك بوصلتك، وابحث عن الدرجة دي بالنسبة لاتجاه الشمال.</small>`;
+
+        // إظهار وتحريك البوصلة الافتراضية
+        const compass = document.getElementById("compass");
+        const needle = document.getElementById("qibla-needle");
+        
+        compass.style.display = "block";
+        // تدوير الإبرة لتشير إلى زاوية القبلة (0 هي الشمال)
+        setTimeout(() => {
+            needle.style.transform = `rotate(${qiblaDeg}deg)`;
+        }, 100);
+    }
+
+    function showError(error) {
+        const resultBox = document.getElementById("result-box");
+        switch(error.code) {
+            case error.PERMISSION_DENIED:
+                resultBox.innerHTML = "رفضت الصلاحية! لازم توافق على تحديد الموقع عشان التطبيق يشتغل.";
+                break;
+            case error.POSITION_UNAVAILABLE:
+                resultBox.innerHTML = "معلومات الموقع غير متوفرة حالياً.";
+                break;
+            case error.TIMEOUT:
+                resultBox.innerHTML = "انتهى وقت الطلب (Timeout)، جرب تاني.";
+                break;
+            default:
+                resultBox.innerHTML = "حصل خطأ غير معروف.";
+                break;
+        }
+    }
+</script>
+</body>
+</html>
